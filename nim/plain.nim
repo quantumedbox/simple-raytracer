@@ -48,38 +48,22 @@ when isMainModule:
 
     header = "P6\n" & $width & ' ' & $height & " \n255\n"
 
-  var myOutputStr = newSeqUninitialized[byte](header.len + 3 * width * height)
+  var myOutputStr: array[header.len + 3 * width * height, byte]
   myOutputStr[0..header.high] = cast[seq[byte]](header)
 
   let
-    workerCount = countProcessors()
     startRenderTime = getMonoTime()
 
-  proc workerThread(id: int) {.thread.} = {.cast(gcSafe).}:
-    var writer = header.len + id * 3
-    for y in countdown(height - 1, 0):
-      var x = id
-      while x < width:
-        let
-          u = x.float32 / width.float32
-          v = y.float32 / height.float32
-          r = Ray(origin: origin, dir: lowerLeftCorner + u * horizontal + v * vertical - origin)
-          color = r.color(vec3(0, 0, -1), 0.5)
+  for y in countdown(height - 1, 0):
+    for x in 0..<width:
+      let
+        u = x.float32 / width.float32
+        v = y.float32 / height.float32
+        r = Ray(origin: origin, dir: lowerLeftCorner + u * horizontal + v * vertical - origin)
+        color = r.color(vec3(0, 0, -1), 0.5)
 
-        myOutputStr[writer..writer+2] =
-          [byte color.x * 255.0,
-           byte color.y * 255.0,
-           byte color.z * 255.0]
-
-        writer += 3 * workerCount
-        x += workerCount
-
-  var workers = newSeq[Thread[int]](workerCount)
-  for id, worker in enumerate workers.mitems:
-    worker.createThread workerThread, id
-
-  for worker in workers:
-    worker.joinThread()
+      let writer = header.len + x + y * width
+      myOutputStr[writer..writer+2] = [byte color.x * 255.0, byte color.y * 255.0, byte color.z * 255.0]
 
   let
     endRenderTime = getMonoTime()
